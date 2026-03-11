@@ -97,7 +97,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 GestureDetector(
                                   onTap: () {
@@ -142,13 +141,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ],
                                       ),
                                     ],
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () {},
-                                  icon: const Icon(
-                                    Icons.menu,
-                                    color: Colors.white,
                                   ),
                                 ),
                               ],

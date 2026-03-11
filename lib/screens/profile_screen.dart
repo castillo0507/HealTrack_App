@@ -8,7 +8,16 @@ import '../widgets/live_background.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  String _getDisplayName(String? email) {
+  String _getDisplayName(AuthProvider auth, String? email) {
+    final fullName = [auth.firstName, auth.surname]
+        .where((part) => part.trim().isNotEmpty)
+        .join(' ')
+        .trim();
+
+    if (fullName.isNotEmpty) {
+      return fullName;
+    }
+
     if (email == null || email.isEmpty) {
       return 'User';
     }
@@ -26,7 +35,7 @@ class ProfileScreen extends StatelessWidget {
     return Consumer2<AuthProvider, HealthProvider>(
       builder: (context, auth, health, child) {
         final email = auth.userEmail;
-        final displayName = _getDisplayName(email);
+        final displayName = _getDisplayName(auth, email);
         final enabledCategories = health.enabledCategories.length;
         final streak = health.streak;
 
@@ -93,9 +102,45 @@ class ProfileScreen extends StatelessWidget {
                 ),
                   const SizedBox(height: 12),
                   _buildInfoTile(
+                  icon: Icons.badge_outlined,
+                  label: 'First Name',
+                  value: auth.firstName.isEmpty ? 'Not set' : auth.firstName,
+                ),
+                  const SizedBox(height: 8),
+                  _buildInfoTile(
+                  icon: Icons.badge_outlined,
+                  label: 'Middle Name',
+                  value: auth.middleName.isEmpty ? 'Not set' : auth.middleName,
+                ),
+                  const SizedBox(height: 8),
+                  _buildInfoTile(
+                  icon: Icons.badge_outlined,
+                  label: 'Surname',
+                  value: auth.surname.isEmpty ? 'Not set' : auth.surname,
+                ),
+                  const SizedBox(height: 8),
+                  _buildInfoTile(
                   icon: Icons.email_outlined,
                   label: 'Email',
                   value: email ?? 'Not set',
+                ),
+                  const SizedBox(height: 8),
+                  _buildInfoTile(
+                  icon: Icons.phone_outlined,
+                  label: 'Contact No.',
+                  value: auth.contactNo.isEmpty ? 'Not set' : auth.contactNo,
+                ),
+                  const SizedBox(height: 8),
+                  _buildInfoTile(
+                  icon: Icons.cake_outlined,
+                  label: 'Age',
+                  value: auth.age.isEmpty ? 'Not set' : auth.age,
+                ),
+                  const SizedBox(height: 8),
+                  _buildInfoTile(
+                  icon: Icons.location_on_outlined,
+                  label: 'Address',
+                  value: auth.address.isEmpty ? 'Not set' : auth.address,
                 ),
                   const SizedBox(height: 8),
                   _buildInfoTile(
@@ -173,57 +218,30 @@ class ProfileScreen extends StatelessWidget {
                       ),
                 ),
                   const SizedBox(height: 12),
-                  Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          await auth.logout();
-                          if (context.mounted) {
-                            Navigator.of(context).pushNamedAndRemoveUntil(
-                              '/login',
-                              (route) => false,
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.logout),
-                        label: const Text('Log out'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          foregroundColor: Colors.red[700],
-                          side: BorderSide(color: Colors.red[300] ?? Colors.red),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await auth.logout();
+                        if (context.mounted) {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/login',
+                            (route) => false,
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.logout),
+                      label: const Text('Log out'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        foregroundColor: Colors.red[700],
+                        side: BorderSide(color: Colors.red[300] ?? Colors.red),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          await auth.logout();
-                          if (context.mounted) {
-                            Navigator.of(context).pushNamedAndRemoveUntil(
-                              '/login',
-                              (route) => false,
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.switch_account),
-                        label: const Text('Switch account'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          backgroundColor: const Color(0xFF3366FF),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                    ).animate().fadeIn(delay: 300.ms),
+                  ).animate().fadeIn(delay: 300.ms),
                   ],
                 ),
               ),

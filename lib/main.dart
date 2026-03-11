@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -28,8 +30,26 @@ class HealTrackApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => HealthProvider()),
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, HealthProvider>(
+          create: (_) => HealthProvider(),
+          update: (_, auth, health) {
+            final provider = health ?? HealthProvider();
+            unawaited(provider.syncWithUser(
+              auth.isAuthenticated ? auth.userEmail : null,
+            ));
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, SettingsProvider>(
+          create: (_) => SettingsProvider(),
+          update: (_, auth, settings) {
+            final provider = settings ?? SettingsProvider();
+            unawaited(provider.syncWithUser(
+              auth.isAuthenticated ? auth.userEmail : null,
+            ));
+            return provider;
+          },
+        ),
       ],
       child: MaterialApp(
         title: 'HealTrack',
@@ -88,18 +108,33 @@ class AppNavigator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<AuthProvider, SettingsProvider>(
-      builder: (context, auth, settings, child) {
-        if (!auth.isInitialized || !settings.isInitialized) {
+    return Consumer3<AuthProvider, SettingsProvider, HealthProvider>(
+      builder: (context, auth, settings, health, child) {
+        if (!auth.isInitialized) {
           return const Scaffold(
             body: Center(
               child: CircularProgressIndicator(),
             ),
           );
         }
-        // Check authentication first
+
+        // Always allow the login screen to render when signed out.
         if (!auth.isAuthenticated) {
           return const LoginScreen();
+        }
+
+        final accountEmail = auth.userEmail;
+        final isSyncingSettings = auth.isAuthenticated && settings.activeUserEmail != accountEmail;
+        final isSyncingHealth = auth.isAuthenticated &&
+            (health.isLoading || health.activeUserEmail != accountEmail);
+        final isLoadingAccount = isSyncingSettings || isSyncingHealth;
+
+        if (!settings.isInitialized || isLoadingAccount) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
 
         // Ask for language first after logging in (once)

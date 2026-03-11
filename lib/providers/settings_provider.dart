@@ -8,6 +8,8 @@ import '../models/health_goals.dart';
 class SettingsProvider with ChangeNotifier {
   bool _hasCompletedOnboarding = false;
   bool _isInitialized = false;
+  String? _activeUserEmail;
+  int _syncVersion = 0;
   
   // Data collection consent toggles
   bool _stepCounterEnabled = true;
@@ -33,14 +35,47 @@ class SettingsProvider with ChangeNotifier {
   bool get vitalSignsEnabled => _vitalSignsEnabled;
   String get languageCode => _languageCode;
   bool get hasSelectedLanguage => _languageCode.isNotEmpty;
+  String? get activeUserEmail => _activeUserEmail;
 
   SettingsProvider() {
-    _initialize();
+    _resetState();
+    _isInitialized = true;
   }
 
-  Future<void> _initialize() async {
-    _hasCompletedOnboarding = await StorageService.getOnboardingComplete();
-    _languageCode = await StorageService.getLanguageCode();
+  void _resetState() {
+    _hasCompletedOnboarding = false;
+    _languageCode = '';
+  }
+
+  Future<void> syncWithUser(String? email) async {
+    final currentVersion = ++_syncVersion;
+
+    if (_activeUserEmail == email && _isInitialized) {
+      return;
+    }
+
+    _activeUserEmail = email;
+    _isInitialized = false;
+    _resetState();
+    notifyListeners();
+
+    if (email == null || email.isEmpty) {
+      _isInitialized = true;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      _hasCompletedOnboarding = await StorageService.getOnboardingComplete();
+      _languageCode = await StorageService.getLanguageCode();
+    } catch (_) {
+      _resetState();
+    }
+
+    if (currentVersion != _syncVersion) {
+      return;
+    }
+
     _isInitialized = true;
     notifyListeners();
   }
@@ -232,6 +267,7 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> deleteAllData() async {
     await StorageService.clearAllData();
+    await syncWithUser(_activeUserEmail);
     notifyListeners();
   }
 }

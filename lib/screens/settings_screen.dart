@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/health_provider.dart';
 import '../widgets/live_background.dart';
@@ -10,8 +11,8 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<SettingsProvider, HealthProvider>(
-      builder: (context, settingsProvider, healthProvider, child) {
+    return Consumer3<AuthProvider, SettingsProvider, HealthProvider>(
+      builder: (context, authProvider, settingsProvider, healthProvider, child) {
         return Stack(
           children: [
             const LiveBackground(),
@@ -138,7 +139,11 @@ class SettingsScreen extends StatelessWidget {
                           label: 'Delete All My Data',
                           subtitle: 'Permanently remove all tracked health data',
                           isDestructive: true,
-                          onTap: () => _showDeleteDialog(context, settingsProvider),
+                          onTap: () => _showDeleteDialog(
+                            context,
+                            settingsProvider,
+                            authProvider,
+                          ),
                         ),
                       ],
                     ),
@@ -423,13 +428,17 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showDeleteDialog(BuildContext context, SettingsProvider provider) {
+  void _showDeleteDialog(
+    BuildContext context,
+    SettingsProvider settingsProvider,
+    AuthProvider authProvider,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete All Data'),
         content: const Text(
-          'Are you sure you want to permanently delete all your health data? This action cannot be undone.',
+          'Are you sure you want to permanently delete this account and all of its data? This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -437,12 +446,19 @@ class SettingsScreen extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              provider.deleteAllData();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+
+              await settingsProvider.deleteAllData();
+              await authProvider.deleteCurrentAccount();
+
+              if (!context.mounted) return;
+              navigator.pop();
+              navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+              messenger.showSnackBar(
                 const SnackBar(
-                  content: Text('All data has been deleted'),
+                  content: Text('All data from this account has been deleted.'),
                   backgroundColor: Colors.red,
                 ),
               );

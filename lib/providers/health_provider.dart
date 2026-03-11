@@ -14,6 +14,8 @@ class HealthProvider with ChangeNotifier {
   bool _isLoading = true;
   DailyHealthSummary? _previousTodaySummary;
   String? _lastEntryId;
+  String? _activeUserEmail;
+  int _syncVersion = 0;
 
   List<HealthCategory> get categories => _categories;
   List<HealthCategory> get enabledCategories => _categories.where((c) => c.isEnabled).toList();
@@ -24,19 +26,56 @@ class HealthProvider with ChangeNotifier {
   int get streak => _streak;
   bool get isLoading => _isLoading;
   bool get canUndoLastActivity => _previousTodaySummary != null && _lastEntryId != null;
+  String? get activeUserEmail => _activeUserEmail;
 
   HealthProvider() {
-    _initialize();
+    _resetState(isLoading: false);
   }
 
-  Future<void> _initialize() async {
+  void _resetState({required bool isLoading}) {
     _categories = HealthCategory.getAllCategories();
-    await loadEnabledCategories();
-    await loadGoals();
-    await loadTodaySummary();
-    await loadWeeklyHistory();
-    await loadStreak();
-    await loadRecentEntries();
+    _todaySummary = null;
+    _recentEntries = [];
+    _weeklyHistory = [];
+    _goals = HealthGoals();
+    _streak = 0;
+    _previousTodaySummary = null;
+    _lastEntryId = null;
+    _isLoading = isLoading;
+  }
+
+  Future<void> syncWithUser(String? email) async {
+    final currentVersion = ++_syncVersion;
+
+    if (_activeUserEmail == email && !_isLoading) {
+      return;
+    }
+
+    _activeUserEmail = email;
+    _resetState(isLoading: true);
+    notifyListeners();
+
+    if (email == null || email.isEmpty) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      await loadEnabledCategories();
+      await loadGoals();
+      await loadTodaySummary();
+      await loadWeeklyHistory();
+      await loadStreak();
+      await loadRecentEntries();
+    } catch (_) {
+      _resetState(isLoading: true);
+    }
+
+    if (currentVersion != _syncVersion) {
+      return;
+    }
+
     _isLoading = false;
     notifyListeners();
   }
