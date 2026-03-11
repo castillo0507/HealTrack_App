@@ -8,6 +8,7 @@ class HealthMetricCard extends StatelessWidget {
   final Color color;
   final double progress;
   final VoidCallback? onTap;
+  final VoidCallback? onDetailsTap;
 
   const HealthMetricCard({
     super.key,
@@ -18,6 +19,7 @@ class HealthMetricCard extends StatelessWidget {
     required this.color,
     this.progress = 0.0,
     this.onTap,
+    this.onDetailsTap,
   });
 
   @override
@@ -81,10 +83,13 @@ class HealthMetricCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                Icon(
-                  Icons.open_in_new,
-                  color: Colors.grey[400],
-                  size: 16,
+                GestureDetector(
+                  onTap: onDetailsTap ?? onTap,
+                  child: Icon(
+                    Icons.open_in_new,
+                    color: Colors.grey[400],
+                    size: 16,
+                  ),
                 ),
               ],
             ),

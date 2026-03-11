@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../providers/health_provider.dart';
 import '../models/health_entry.dart';
+import '../widgets/live_background.dart';
 
 class ReportScreen extends StatelessWidget {
   const ReportScreen({super.key});
@@ -21,62 +22,67 @@ class ReportScreen extends StatelessWidget {
         final recommendations = _generateRecommendations(weeklyStats, goals);
         final healthScore = _calculateHealthScore(weeklyStats, goals);
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF3366FF),
-            title: const Text(
-              'Health Report',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share),
-                onPressed: () => _shareReport(context, weeklyStats, healthScore),
+        return Stack(
+          children: [
+            const LiveBackground(),
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                backgroundColor: const Color(0xFF3366FF),
+                title: const Text(
+                  'Health Report',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.share),
+                    onPressed: () => _shareReport(context, weeklyStats, healthScore),
+                  ),
+                ],
               ),
-            ],
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Report Header
-                _buildReportHeader(context, healthScore),
-                const SizedBox(height: 24),
-                
-                // Today's Summary
-                _buildSectionTitle(context, 'Today\'s Summary', Icons.today),
-                const SizedBox(height: 12),
-                _buildTodaySummaryCard(context, todaySummary, goals),
-                const SizedBox(height: 24),
-                
-                // Weekly Analysis
-                _buildSectionTitle(context, 'Weekly Analysis', Icons.analytics),
-                const SizedBox(height: 12),
-                _buildWeeklyAnalysisCard(context, weeklyStats, goals),
-                const SizedBox(height: 24),
-                
-                // Health Metrics Breakdown
-                _buildSectionTitle(context, 'Metrics Breakdown', Icons.pie_chart),
-                const SizedBox(height: 12),
-                _buildMetricsBreakdown(context, weeklyStats, goals),
-                const SizedBox(height: 24),
-                
-                // Recommendations
-                _buildSectionTitle(context, 'Recommendations', Icons.lightbulb_outline),
-                const SizedBox(height: 12),
-                _buildRecommendationsCard(context, recommendations),
-                const SizedBox(height: 24),
-                
-                // Trends
-                _buildSectionTitle(context, 'Trends & Patterns', Icons.trending_up),
-                const SizedBox(height: 12),
-                _buildTrendsCard(context, weeklyHistory),
-                const SizedBox(height: 100),
-              ],
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Report Header
+                    _buildReportHeader(context, healthScore, weeklyHistory),
+                    const SizedBox(height: 24),
+
+                    // Today's Summary
+                    _buildSectionTitle(context, 'Today\'s Summary', Icons.today),
+                    const SizedBox(height: 12),
+                    _buildTodaySummaryCard(context, todaySummary, goals),
+                    const SizedBox(height: 24),
+
+                    // Weekly Analysis
+                    _buildSectionTitle(context, 'Weekly Analysis', Icons.analytics),
+                    const SizedBox(height: 12),
+                    _buildWeeklyAnalysisCard(context, weeklyStats, goals),
+                    const SizedBox(height: 24),
+
+                    // Health Metrics Breakdown
+                    _buildSectionTitle(context, 'Metrics Breakdown', Icons.pie_chart),
+                    const SizedBox(height: 12),
+                    _buildMetricsBreakdown(context, weeklyStats, goals),
+                    const SizedBox(height: 24),
+
+                    // Recommendations
+                    _buildSectionTitle(context, 'Recommendations', Icons.lightbulb_outline),
+                    const SizedBox(height: 12),
+                    _buildRecommendationsCard(context, recommendations),
+                    const SizedBox(height: 24),
+
+                    // Trends
+                    _buildSectionTitle(context, 'Trends & Patterns', Icons.trending_up),
+                    const SizedBox(height: 12),
+                    _buildTrendsCard(context, weeklyHistory),
+                    const SizedBox(height: 100),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -261,7 +267,24 @@ class ReportScreen extends StatelessWidget {
     return recommendations;
   }
 
-  Widget _buildReportHeader(BuildContext context, int healthScore) {
+  Widget _buildReportHeader(
+    BuildContext context,
+    int healthScore,
+    List<DailyHealthSummary> weeklyHistory,
+  ) {
+    DateTime? startDate;
+    DateTime? endDate;
+
+    if (weeklyHistory.isNotEmpty) {
+      startDate = weeklyHistory.first.date;
+      endDate = weeklyHistory.last.date;
+    } else {
+      endDate = DateTime.now();
+      startDate = endDate.subtract(const Duration(days: 6));
+    }
+
+    final dateRangeText =
+        '${DateFormat('MMM d').format(startDate)} - ${DateFormat('MMM d, yyyy').format(endDate)}';
     Color scoreColor;
     String scoreLabel;
     if (healthScore >= 80) {
@@ -303,9 +326,7 @@ class ReportScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  DateFormat('MMM d - MMM d, yyyy').format(
-                    DateTime.now().subtract(const Duration(days: 6)),
-                  ),
+                  dateRangeText,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 12,

@@ -3,9 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/health_provider.dart';
 import '../models/health_category.dart';
+import '../widgets/live_background.dart';
 
 class AddEntryScreen extends StatefulWidget {
-  const AddEntryScreen({super.key});
+  final HealthCategoryType? initialCategory;
+
+  const AddEntryScreen({super.key, this.initialCategory});
 
   @override
   State<AddEntryScreen> createState() => _AddEntryScreenState();
@@ -15,6 +18,12 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
   HealthCategoryType? _selectedCategory;
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategory = widget.initialCategory;
+  }
 
   @override
   void dispose() {
@@ -30,125 +39,129 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
       builder: (context, healthProvider, child) {
         final enabledCategories = healthProvider.enabledCategories;
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF3366FF),
-            title: const Text(
-              'Add Entry',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            automaticallyImplyLeading: false,
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Log Health Data',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ).animate().fadeIn(),
-                const SizedBox(height: 8),
-                Text(
-                  'Select a category and enter your health metrics',
-                  style: TextStyle(color: Colors.grey[600]),
-                ).animate().fadeIn(delay: 100.ms),
-                const SizedBox(height: 24),
-                // Category Selection
-                Text(
-                  'Select Category',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
-                  ),
-                ).animate().fadeIn(delay: 200.ms),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: enabledCategories.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final category = entry.value;
-                    final isSelected = _selectedCategory == category.type;
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedCategory = category.type;
-                          _controllers.clear();
-                        });
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected ? category.color : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected ? category.color : Colors.grey.shade300,
+        return Stack(
+          children: [
+            const LiveBackground(),
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                backgroundColor: const Color(0xFF3366FF),
+                title: const Text(
+                  'Add Entry',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Log Health Data',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
+                    ).animate().fadeIn(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Select a category and enter your health metrics',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ).animate().fadeIn(delay: 100.ms),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Select Category',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[800],
+                      ),
+                    ).animate().fadeIn(delay: 200.ms),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: enabledCategories.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final category = entry.value;
+                        final isSelected = _selectedCategory == category.type;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedCategory = category.type;
+                              _controllers.clear();
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected ? category.color : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected ? category.color : Colors.grey.shade300,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  category.icon,
+                                  color: isSelected ? Colors.white : category.color,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  category.name,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.grey[700],
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ).animate().fadeIn(
+                              delay: Duration(milliseconds: 300 + (index * 50)),
+                            );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 32),
+                    if (_selectedCategory != null) ...[
+                      _buildEntryForm(context, healthProvider),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(40),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade200),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Column(
                           children: [
                             Icon(
-                              category.icon,
-                              color: isSelected ? Colors.white : category.color,
-                              size: 20,
+                              Icons.touch_app,
+                              size: 48,
+                              color: Colors.grey[400],
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(height: 16),
                             Text(
-                              category.name,
+                              'Select a category above to start logging',
                               style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.grey[700],
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                color: Colors.grey[500],
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ).animate().fadeIn(delay: Duration(milliseconds: 300 + (index * 50)));
-                  }).toList(),
+                      ).animate().fadeIn(delay: 500.ms),
+                    ],
+                    const SizedBox(height: 100),
+                  ],
                 ),
-                const SizedBox(height: 32),
-                // Entry Form
-                if (_selectedCategory != null) ...[
-                  _buildEntryForm(context, healthProvider),
-                ] else ...[
-                  Container(
-                    padding: const EdgeInsets.all(40),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.touch_app,
-                          size: 48,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Select a category above to start logging',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(delay: 500.ms),
-                ],
-                const SizedBox(height: 100),
-              ],
+              ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -267,7 +280,14 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
         ];
       case HealthCategoryType.hydration:
         return [
-          {'key': 'water', 'label': 'Water Intake', 'hint': 'Enter amount in ml', 'type': 'number', 'suffix': 'ml', 'required': 'true'},
+          {
+            'key': 'water',
+            'label': 'Water Intake',
+            'hint': 'Number of glasses (1 glass ≈ 250 ml)',
+            'type': 'number',
+            'suffix': 'glasses',
+            'required': 'true',
+          },
         ];
       case HealthCategoryType.mentalWellness:
         return [
@@ -436,12 +456,14 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
             break;
             
           case HealthCategoryType.hydration:
-            final waterMl = double.tryParse(_controllers['water']?.text ?? '') ?? 0;
-            final waterLiters = waterMl / 1000;
+                final glasses = double.tryParse(_controllers['water']?.text ?? '') ?? 0;
+                // 1 glass ≈ 250 ml = 0.25 L
+                final waterLiters = glasses * 0.25;
             final dailyGoal = provider.goals.waterGoal;
             await provider.updateWaterIntake(waterLiters);
             final totalToday = provider.todaySummary?.waterIntake ?? waterLiters;
             computedResults = {
+                  'Glasses Today': '${(totalToday / 0.25).toStringAsFixed(1)} glasses',
               'Total Today': '${totalToday.toStringAsFixed(1)} L',
               'Progress': '${((totalToday / dailyGoal) * 100).toStringAsFixed(0)}% of daily goal',
             };
@@ -471,11 +493,43 @@ class _AddEntryScreenState extends State<AddEntryScreen> {
             final mealName = _controllers['mealName']?.text ?? 'Meal';
             await provider.updateNutrition(calories, protein: protein, carbs: carbs);
             final totalCalories = provider.todaySummary?.nutritionCalories ?? calories;
+            // Simple analysis based on meal type and macros
+            final p = protein ?? 0;
+            final c = carbs ?? 0;
+            final f = fat ?? 0;
+            String macroFocus;
+            if (p == 0 && c == 0 && f == 0) {
+              macroFocus = 'No macro details provided';
+            } else if (p >= c && p >= f) {
+              macroFocus = 'High protein meal';
+            } else if (c >= p && c >= f) {
+              macroFocus = 'High carbohydrate meal';
+            } else {
+              macroFocus = 'High fat meal';
+            }
+
+            String mealSize;
+            final dailyCaloriesGoal = provider.goals.caloriesGoal;
+            if (dailyCaloriesGoal <= 0) {
+              mealSize = 'Meal size relative to day not set';
+            } else {
+              final ratio = calories / dailyCaloriesGoal;
+              if (ratio < 0.25) {
+                mealSize = 'Light meal';
+              } else if (ratio < 0.5) {
+                mealSize = 'Moderate meal';
+              } else {
+                mealSize = 'Heavy meal';
+              }
+            }
+
             computedResults = {
               'Meal': mealName,
               'Meal Calories': '$calories cal',
               'Total Today': '$totalCalories cal',
               'Breakdown': 'P:${protein ?? 0}g C:${carbs ?? 0}g F:${fat ?? 0}g',
+              'Macro Focus': macroFocus,
+              'Meal Size': mealSize,
             };
             break;
             

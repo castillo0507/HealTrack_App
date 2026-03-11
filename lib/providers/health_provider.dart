@@ -12,6 +12,8 @@ class HealthProvider with ChangeNotifier {
   HealthGoals _goals = HealthGoals();
   int _streak = 0;
   bool _isLoading = true;
+  DailyHealthSummary? _previousTodaySummary;
+  String? _lastEntryId;
 
   List<HealthCategory> get categories => _categories;
   List<HealthCategory> get enabledCategories => _categories.where((c) => c.isEnabled).toList();
@@ -21,6 +23,7 @@ class HealthProvider with ChangeNotifier {
   HealthGoals get goals => _goals;
   int get streak => _streak;
   bool get isLoading => _isLoading;
+  bool get canUndoLastActivity => _previousTodaySummary != null && _lastEntryId != null;
 
   HealthProvider() {
     _initialize();
@@ -97,6 +100,8 @@ class HealthProvider with ChangeNotifier {
       _todaySummary = DailyHealthSummary(date: today);
       await StorageService.saveDailySummary(_todaySummary!);
     }
+    // Ensure streak is checked at least once per day when the app is used
+    await updateStreak();
     notifyListeners();
   }
 
@@ -126,6 +131,7 @@ class HealthProvider with ChangeNotifier {
   // Real-time update methods for each category
   Future<void> updateSteps(int steps, {double? caloriesBurned}) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     final calories = caloriesBurned ?? (steps * 0.04);
     _todaySummary = _todaySummary!.copyWith(
@@ -142,6 +148,7 @@ class HealthProvider with ChangeNotifier {
 
   Future<void> updateWaterIntake(double liters) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     _todaySummary = _todaySummary!.copyWith(waterIntake: liters);
     await _saveTodaySummaryAndRecalculate();
@@ -150,6 +157,7 @@ class HealthProvider with ChangeNotifier {
 
   Future<void> addWater(double mlToAdd) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     final newTotal = _todaySummary!.waterIntake + (mlToAdd / 1000);
     _todaySummary = _todaySummary!.copyWith(waterIntake: newTotal);
@@ -159,6 +167,7 @@ class HealthProvider with ChangeNotifier {
 
   Future<void> updateSleep(double hours, {int? quality}) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     _todaySummary = _todaySummary!.copyWith(sleepHours: hours);
     await _saveTodaySummaryAndRecalculate();
@@ -167,6 +176,7 @@ class HealthProvider with ChangeNotifier {
 
   Future<void> updateHeartRate(int bpm, {int? restingBpm}) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     _todaySummary = _todaySummary!.copyWith(
       heartRate: bpm,
@@ -182,6 +192,7 @@ class HealthProvider with ChangeNotifier {
     int? diastolicBP,
   }) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     _todaySummary = _todaySummary!.copyWith(
       temperature: temperature ?? _todaySummary!.temperature,
@@ -198,6 +209,7 @@ class HealthProvider with ChangeNotifier {
 
   Future<void> updateNutrition(int calories, {int? protein, int? carbs, int? fat}) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     _todaySummary = _todaySummary!.copyWith(nutritionCalories: calories);
     await _saveTodaySummaryAndRecalculate();
@@ -211,6 +223,7 @@ class HealthProvider with ChangeNotifier {
 
   Future<void> addMeal(int calories, {String? mealName}) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     final newTotal = _todaySummary!.nutritionCalories + calories;
     _todaySummary = _todaySummary!.copyWith(nutritionCalories: newTotal);
@@ -228,6 +241,7 @@ class HealthProvider with ChangeNotifier {
     int? meditationMinutes,
   }) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     _todaySummary = _todaySummary!.copyWith(
       mood: mood ?? _todaySummary!.mood,
@@ -248,6 +262,7 @@ class HealthProvider with ChangeNotifier {
     int? intensity,
   }) async {
     if (_todaySummary == null) return;
+    _previousTodaySummary = _todaySummary;
     
     final totalMinutes = _todaySummary!.workoutMinutes + minutes;
     _todaySummary = _todaySummary!.copyWith(
@@ -270,6 +285,7 @@ class HealthProvider with ChangeNotifier {
       timestamp: DateTime.now(),
       data: data,
     );
+    _lastEntryId = entry.id;
     
     await StorageService.saveHealthEntry(entry);
     _recentEntries.insert(0, entry);
@@ -285,6 +301,8 @@ class HealthProvider with ChangeNotifier {
     _recalculateProgress();
     await StorageService.saveDailySummary(_todaySummary!);
     await updateStreak();
+    // Ensure all views that depend on weekly history and summaries stay in sync
+    await loadWeeklyHistory();
     notifyListeners();
   }
 
@@ -409,11 +427,31 @@ class HealthProvider with ChangeNotifier {
   }
 
   Future<void> addHealthEntry(HealthEntry entry) async {
+    _lastEntryId = entry.id;
     await StorageService.saveHealthEntry(entry);
     _recentEntries.insert(0, entry);
     if (_recentEntries.length > 20) {
       _recentEntries = _recentEntries.sublist(0, 20);
     }
     notifyListeners();
+  }
+
+  Future<bool> undoLastActivity() async {
+    if (_todaySummary == null || _previousTodaySummary == null) {
+      return false;
+    }
+
+    _todaySummary = _previousTodaySummary;
+    _previousTodaySummary = null;
+
+    if (_lastEntryId != null) {
+      await StorageService.removeHealthEntryById(_lastEntryId!);
+      _lastEntryId = null;
+      await loadRecentEntries();
+    }
+
+    await _saveTodaySummaryAndRecalculate();
+    await loadWeeklyHistory();
+    return true;
   }
 }

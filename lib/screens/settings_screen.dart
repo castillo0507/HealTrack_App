@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/settings_provider.dart';
 import '../providers/health_provider.dart';
+import '../widgets/live_background.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -11,182 +12,216 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer2<SettingsProvider, HealthProvider>(
       builder: (context, settingsProvider, healthProvider, child) {
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF1A237E),
-            title: const Text(
-              'Settings',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            automaticallyImplyLeading: false,
-            actions: [
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
+        return Stack(
+          children: [
+            const LiveBackground(),
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                backgroundColor: const Color(0xFF1A237E),
+                title: const Text(
+                  'Settings',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
-            ],
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Manage your preferences and data',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ).animate().fadeIn(),
-                const SizedBox(height: 24),
-                // Data Collection Consent
-                _buildSectionCard(
-                  context,
-                  title: 'Data Collection Consent',
-                  icon: Icons.toggle_on_outlined,
-                  delay: 200,
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Control what health metrics you want to track. Disabling a feature will stop data collection immediately.',
+                      'Manage your preferences and data',
                       style: TextStyle(
                         color: Colors.grey[600],
-                        fontSize: 13,
-                        height: 1.4,
+                        fontSize: 14,
                       ),
+                    ).animate().fadeIn(),
+                    const SizedBox(height: 24),
+                    _buildSectionCard(
+                      context,
+                      title: 'Data Collection Consent',
+                      icon: Icons.toggle_on_outlined,
+                      delay: 200,
+                      children: [
+                        Text(
+                          'Control what health metrics you want to track. Disabling a feature will stop data collection immediately.',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildConsentToggle(
+                          context,
+                          title: 'Step Counter',
+                          subtitle: 'Track your daily steps',
+                          value: settingsProvider.stepCounterEnabled,
+                          onChanged: settingsProvider.toggleStepCounter,
+                        ),
+                        const Divider(height: 24),
+                        _buildConsentToggle(
+                          context,
+                          title: 'Sleep Tracking',
+                          subtitle: 'Monitor sleep patterns',
+                          value: settingsProvider.sleepTrackingEnabled,
+                          onChanged: settingsProvider.toggleSleepTracking,
+                        ),
+                        const Divider(height: 24),
+                        _buildConsentToggle(
+                          context,
+                          title: 'Heart Rate Monitor',
+                          subtitle: 'Track cardiovascular health',
+                          value: settingsProvider.heartRateEnabled,
+                          onChanged: settingsProvider.toggleHeartRate,
+                        ),
+                        const Divider(height: 24),
+                        _buildConsentToggle(
+                          context,
+                          title: 'Hydration',
+                          subtitle: 'Track your daily water intake',
+                          value: settingsProvider.hydrationEnabled,
+                          onChanged: settingsProvider.toggleHydration,
+                        ),
+                        const Divider(height: 24),
+                        _buildConsentToggle(
+                          context,
+                          title: 'Nutrition',
+                          subtitle: 'Track meals and calories',
+                          value: settingsProvider.nutritionEnabled,
+                          onChanged: settingsProvider.toggleNutrition,
+                        ),
+                        const Divider(height: 24),
+                        _buildConsentToggle(
+                          context,
+                          title: 'Mental Wellness',
+                          subtitle: 'Track mood and stress',
+                          value: settingsProvider.mentalWellnessEnabled,
+                          onChanged: settingsProvider.toggleMentalWellness,
+                        ),
+                        const Divider(height: 24),
+                        _buildConsentToggle(
+                          context,
+                          title: 'Exercise & Workouts',
+                          subtitle: 'Track your workout sessions',
+                          value: settingsProvider.workoutEnabled,
+                          onChanged: settingsProvider.toggleWorkout,
+                        ),
+                        const Divider(height: 24),
+                        _buildConsentToggle(
+                          context,
+                          title: 'Vital Signs',
+                          subtitle: 'Track blood pressure and more',
+                          value: settingsProvider.vitalSignsEnabled,
+                          onChanged: settingsProvider.toggleVitalSigns,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
-                    _buildConsentToggle(
+                    _buildSectionCard(
                       context,
-                      title: 'Step Counter',
-                      subtitle: 'Track daily steps and distance',
-                      value: settingsProvider.stepCounterEnabled,
-                      onChanged: settingsProvider.toggleStepCounter,
-                    ),
-                    const Divider(height: 24),
-                    _buildConsentToggle(
-                      context,
-                      title: 'Sleep Tracking',
-                      subtitle: 'Monitor sleep patterns',
-                      value: settingsProvider.sleepTrackingEnabled,
-                      onChanged: settingsProvider.toggleSleepTracking,
-                    ),
-                    const Divider(height: 24),
-                    _buildConsentToggle(
-                      context,
-                      title: 'Heart Rate Monitor',
-                      subtitle: 'Track cardiovascular health',
-                      value: settingsProvider.heartRateEnabled,
-                      onChanged: settingsProvider.toggleHeartRate,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Data Management
-                _buildSectionCard(
-                  context,
-                  title: 'Data Management',
-                  icon: Icons.folder_outlined,
-                  delay: 400,
-                  children: [
-                    _buildActionButton(
-                      context,
-                      icon: Icons.download_outlined,
-                      label: 'Export My Data',
-                      subtitle: 'Download all your health data in JSON format',
-                      onTap: () => _showExportDialog(context, settingsProvider),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildActionButton(
-                      context,
-                      icon: Icons.delete_outline,
-                      label: 'Delete All My Data',
-                      subtitle: 'Permanently remove all tracked health data',
-                      isDestructive: true,
-                      onTap: () => _showDeleteDialog(context, settingsProvider),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Consent Withdrawal Notice
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF8E1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Consent Withdrawal',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange[900],
+                      title: 'Data Management',
+                      icon: Icons.folder_outlined,
+                      delay: 400,
+                      children: [
+                        _buildActionButton(
+                          context,
+                          icon: Icons.download_outlined,
+                          label: 'Export My Data',
+                          subtitle: 'Download all your health data as a PDF',
+                          onTap: () => _showExportDialog(context, settingsProvider),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'You can withdraw your consent for any data collection at any time by toggling off the switches above. Data collection will stop immediately.',
-                        style: TextStyle(
-                          color: Colors.orange[800],
-                          fontSize: 13,
-                          height: 1.4,
+                        const SizedBox(height: 12),
+                        _buildActionButton(
+                          context,
+                          icon: Icons.delete_outline,
+                          label: 'Delete All My Data',
+                          subtitle: 'Permanently remove all tracked health data',
+                          isDestructive: true,
+                          onTap: () => _showDeleteDialog(context, settingsProvider),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF8E1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'To completely remove all data, use the "Delete All My Data" option above.',
-                        style: TextStyle(
-                          color: Colors.orange[800],
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn(delay: 600.ms),
-                const SizedBox(height: 20),
-                // Your Data is Safe
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE3F2FD),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.lock_outline,
-                            color: Colors.amber[700],
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
                           Text(
-                            'Your Data is Safe',
+                            'Consent Withdrawal',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue[900],
+                              color: Colors.orange[900],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'You can withdraw your consent for any data collection at any time by toggling off the switches above. Data collection will stop immediately.',
+                            style: TextStyle(
+                              color: Colors.orange[800],
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'To completely remove all data, use the "Delete All My Data" option above.',
+                            style: TextStyle(
+                              color: Colors.orange[800],
+                              fontSize: 13,
+                              height: 1.4,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      _buildSafetyItem('Stored only on your device'),
-                      _buildSafetyItem('Never sent to external servers'),
-                      _buildSafetyItem('Not shared with third parties'),
-                      _buildSafetyItem('Not used for advertising'),
-                      _buildSafetyItem('You have complete control'),
-                    ],
-                  ),
-                ).animate().fadeIn(delay: 800.ms),
-                const SizedBox(height: 100),
-              ],
+                    ).animate().fadeIn(delay: 600.ms),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE3F2FD),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.lock_outline,
+                                color: Colors.amber[700],
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Your Data is Safe',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[900],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSafetyItem('Stored only on your device'),
+                          _buildSafetyItem('Never sent to external servers'),
+                          _buildSafetyItem('Not shared with third parties'),
+                          _buildSafetyItem('Not used for advertising'),
+                          _buildSafetyItem('You have complete control'),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 800.ms),
+                    const SizedBox(height: 100),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -273,7 +308,7 @@ class SettingsScreen extends StatelessWidget {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: const Color(0xFF3366FF),
+          activeThumbColor: const Color(0xFF3366FF),
         ),
       ],
     );

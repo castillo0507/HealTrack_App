@@ -4,6 +4,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/health_provider.dart';
 import '../models/health_entry.dart';
+import '../widgets/live_background.dart';
+import '../services/storage_service.dart';
 
 class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key});
@@ -14,16 +16,40 @@ class InsightsScreen extends StatefulWidget {
 
 class _InsightsScreenState extends State<InsightsScreen> {
   String _selectedPeriod = 'Week';
+  List<DailyHealthSummary> _allSummaries = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllSummaries();
+  }
+
+  Future<void> _loadAllSummaries() async {
+    final summaries = await StorageService.getDailySummaries();
+    setState(() {
+      _allSummaries = summaries;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<HealthProvider>(
       builder: (context, healthProvider, child) {
         final weeklyHistory = healthProvider.weeklyHistory;
+        final todaySummary = healthProvider.todaySummary;
+
+        final periodSummaries = _getSummariesForPeriod(
+          _selectedPeriod,
+          weeklyHistory,
+          todaySummary,
+        );
         
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
-          appBar: AppBar(
+        return Stack(
+          children: [
+            const LiveBackground(),
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
             backgroundColor: const Color(0xFF3366FF),
             title: const Text(
               'Insights',
@@ -31,9 +57,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
             ),
             automaticallyImplyLeading: false,
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Period Selector
@@ -77,11 +103,13 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 ),
                 const SizedBox(height: 20),
                 // Summary Stats
-                _buildSummaryStats(context, weeklyHistory),
+                _buildSummaryStats(context, periodSummaries, _selectedPeriod),
                 const SizedBox(height: 100),
-              ],
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -109,6 +137,60 @@ class _InsightsScreenState extends State<InsightsScreen> {
         ),
       ),
     );
+  }
+
+  List<DailyHealthSummary> _getSummariesForPeriod(
+    String period,
+    List<DailyHealthSummary> weeklyHistory,
+    DailyHealthSummary? todaySummary,
+  ) {
+    // Use all stored summaries when available, otherwise fall back to weekly history
+    final List<DailyHealthSummary> source =
+        _allSummaries.isNotEmpty ? _allSummaries : weeklyHistory;
+
+    if (source.isEmpty) {
+      if (period == 'Day' && todaySummary != null) {
+        return [todaySummary];
+      }
+      return [];
+    }
+
+    DateTime today = DateTime.now();
+    DateTime start;
+
+    switch (period) {
+      case 'Day':
+        if (todaySummary != null) {
+          return [todaySummary];
+        }
+        start = DateTime(today.year, today.month, today.day);
+        return source
+            .where((s) {
+              final d = DateTime(s.date.year, s.date.month, s.date.day);
+              return d == start;
+            })
+            .toList();
+      case 'Month':
+        start = today.subtract(const Duration(days: 29));
+        break;
+      case 'Year':
+        start = today.subtract(const Duration(days: 364));
+        break;
+      case 'Week':
+      default:
+        start = today.subtract(const Duration(days: 6));
+        break;
+    }
+
+    final DateTime startDay = DateTime(start.year, start.month, start.day);
+    final DateTime endDay = DateTime(today.year, today.month, today.day);
+
+    return source
+        .where((s) {
+          final d = DateTime(s.date.year, s.date.month, s.date.day);
+          return !d.isBefore(startDay) && !d.isAfter(endDay);
+        })
+        .toList();
   }
 
   Widget _buildChartCard(
@@ -441,8 +523,110 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  Widget _buildSummaryStats(BuildContext context, List<DailyHealthSummary> weeklyHistory) {
-    // Calculate real averages from weekly history
+  String _summaryTitleForPeriod(String period) {
+    switch (period) {
+      case 'Day':
+        return 'Daily Summary';
+      case 'Month':
+        return 'Monthly Summary';
+      case 'Year':
+        return 'Yearly Summary';
+      case 'Week':
+      default:
+        return 'Weekly Summary';
+    }
+  }
+
+  Widget _buildSummaryStats(
+    BuildContext context,
+    List<DailyHealthSummary> periodSummaries,
+    String period,
+  ) {
+    if (periodSummaries.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8.0),
+        child: Text(
+          'No data for selected $period period yet.',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+      );
+    }
+
+    // For Day view, show the latest day's actual values instead of averages
+    if (period == 'Day') {
+      // Use the most recent summary for the day
+      final day = periodSummaries.last;
+
+      int steps = day.steps;
+      double sleep = day.sleepHours;
+      int heartRate = day.heartRate;
+      bool active = steps > 0 || sleep > 0 || day.waterIntake > 0;
+
+      String formatNumber(int number) {
+        if (number >= 1000) {
+          return '${(number / 1000).toStringAsFixed(1)}k';
+        }
+        return number.toString();
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _summaryTitleForPeriod(period),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ).animate().fadeIn(delay: 800.ms),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  'Steps Today',
+                  steps > 0 ? formatNumber(steps) : '--',
+                  Icons.directions_walk,
+                  const Color(0xFF3366FF),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  'Sleep Today',
+                  sleep > 0 ? '${sleep.toStringAsFixed(1)} hrs' : '--',
+                  Icons.bedtime,
+                  const Color(0xFF673AB7),
+                ),
+              ),
+            ],
+          ).animate().fadeIn(delay: 900.ms),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  'Heart Rate',
+                  heartRate > 0 ? '$heartRate BPM' : '--',
+                  Icons.favorite,
+                  const Color(0xFFE91E63),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  'Active Today',
+                  active ? 'Yes' : 'No',
+                  Icons.check_circle,
+                  const Color(0xFF4CAF50),
+                ),
+              ),
+            ],
+          ).animate().fadeIn(delay: 1000.ms),
+        ],
+      );
+    }
+
+    // For Week/Month/Year, calculate averages over the selected period
     int totalSteps = 0;
     double totalSleep = 0;
     int totalHeartRate = 0;
@@ -450,8 +634,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
     int stepsCount = 0;
     int sleepCount = 0;
     int heartRateCount = 0;
-    
-    for (var day in weeklyHistory) {
+
+    for (var day in periodSummaries) {
       if (day.steps > 0) {
         totalSteps += day.steps;
         stepsCount++;
@@ -483,7 +667,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Weekly Summary',
+          _summaryTitleForPeriod(period),
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -525,7 +709,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             Expanded(
               child: _buildSummaryCard(
                 'Active Days',
-                '$activeDays/${weeklyHistory.length}',
+                '$activeDays/${periodSummaries.length}',
                 Icons.check_circle,
                 const Color(0xFF4CAF50),
               ),

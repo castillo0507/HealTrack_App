@@ -374,10 +374,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Handle forgot password
                             _showForgotPasswordDialog();
                           },
-                          child: Text(
+                          child: const Text(
                             'Forgot password?',
                             style: TextStyle(
-                              color: const Color(0xFF3366FF),
+                              color: Color(0xFF3366FF),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -531,11 +531,6 @@ class _LoginScreenState extends State<LoginScreen> {
 class StethoscopePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
     // Draw the tube part
     final tubePaint = Paint()
       ..color = const Color(0xFF3366FF)

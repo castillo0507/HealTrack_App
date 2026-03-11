@@ -12,6 +12,8 @@ import 'screens/insights_screen.dart';
 import 'screens/add_entry_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/report_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/language_selection_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,11 +70,13 @@ class HealTrackApp extends StatelessWidget {
           '/': (context) => const AppNavigator(),
           '/login': (context) => const LoginScreen(),
           '/welcome': (context) => const WelcomeScreen(),
+          '/language': (context) => const LanguageSelectionScreen(),
           '/categories': (context) => const CategorySelectionScreen(),
           '/home': (context) => const HomeScreen(),
           '/settings': (context) => const SettingsScreen(),
           '/insights': (context) => const InsightsScreen(),
           '/add': (context) => const AddEntryScreen(),
+          '/profile': (context) => const ProfileScreen(),
         },
       ),
     );
@@ -93,12 +97,16 @@ class AppNavigator extends StatelessWidget {
             ),
           );
         }
-        
         // Check authentication first
         if (!auth.isAuthenticated) {
           return const LoginScreen();
         }
-        
+
+        // Ask for language first after logging in (once)
+        if (!settings.hasSelectedLanguage) {
+          return const LanguageSelectionScreen();
+        }
+
         if (!settings.hasCompletedOnboarding) {
           return const WelcomeScreen();
         }

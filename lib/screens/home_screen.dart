@@ -1,18 +1,65 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/health_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/health_category.dart';
 import '../widgets/health_metric_card.dart';
+import '../widgets/live_background.dart';
+import 'profile_screen.dart';
+import 'add_entry_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final Function(int)? onNavigate;
   
   const HomeScreen({super.key, this.onNavigate});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late DateTime _now;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = DateTime.now();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      setState(() {
+        _now = DateTime.now();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _getDisplayName(String? email) {
+    if (email == null || email.isEmpty) {
+      return 'User';
+    }
+    final atIndex = email.indexOf('@');
+    if (atIndex <= 0) {
+      return email;
+    }
+    final namePart = email.substring(0, atIndex);
+    if (namePart.isEmpty) return 'User';
+    return namePart[0].toUpperCase() + namePart.substring(1);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final userEmail = authProvider.userEmail;
+    final displayName = _getDisplayName(userEmail);
+
     return Consumer<HealthProvider>(
       builder: (context, healthProvider, child) {
         final summary = healthProvider.todaySummary;
@@ -20,10 +67,11 @@ class HomeScreen extends StatelessWidget {
         final streak = healthProvider.streak;
         final progress = healthProvider.calculateOverallProgress();
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
-          body: CustomScrollView(
-            slivers: [
+        return Stack(
+          children: [
+            const LiveBackground(),
+            CustomScrollView(
+              slivers: [
               // App Bar
               SliverAppBar(
                 expandedHeight: 180,
@@ -51,41 +99,50 @@ class HomeScreen extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(12),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) => const ProfileScreen(),
                                       ),
-                                      child: const Icon(
-                                        Icons.person_outline,
-                                        color: Colors.white,
+                                    );
+                                  },
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(
+                                          Icons.person_outline,
+                                          color: Colors.white,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Hello, User!',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Hello, $displayName!',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                        ),
-                                        Text(
-                                          DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
-                                          style: TextStyle(
-                                            color: Colors.white.withOpacity(0.8),
-                                            fontSize: 13,
+                                          Text(
+                                            DateFormat('EEEE, MMMM d, yyyy – HH:mm').format(_now),
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.8),
+                                              fontSize: 13,
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                                 IconButton(
                                   onPressed: () {},
@@ -162,8 +219,8 @@ class HomeScreen extends StatelessWidget {
                           ),
                           TextButton.icon(
                             onPressed: () {
-                              if (onNavigate != null) {
-                                onNavigate!(1); // Navigate to Insights tab
+                              if (widget.onNavigate != null) {
+                                widget.onNavigate!(1); // Navigate to Insights tab
                               }
                             },
                             icon: const Icon(
@@ -185,6 +242,37 @@ class HomeScreen extends StatelessWidget {
                       // Metrics Grid
                       _buildMetricsGrid(context, healthProvider, summary),
                       const SizedBox(height: 24),
+                      // Badges
+                      Text(
+                        'Badges',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
+                      ).animate().fadeIn(delay: 900.ms),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildBadgeCard(
+                              title: _getStreakBadgeTitle(streak),
+                              subtitle: 'Login streak: $streak day${streak == 1 ? '' : 's'}',
+                              icon: Icons.local_fire_department,
+                              color: Colors.orange,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildBadgeCard(
+                              title: _getActivityBadgeTitle(progress),
+                              subtitle: 'Today\'s activity ${(progress * 100).toInt()}%',
+                              icon: Icons.emoji_events,
+                              color: Colors.purple,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
                       // Quick Actions
                       Text(
                         'Quick Actions',
@@ -202,8 +290,8 @@ class HomeScreen extends StatelessWidget {
                               icon: Icons.add,
                               label: 'Log Activity',
                               onTap: () {
-                                if (onNavigate != null) {
-                                  onNavigate!(2); // Navigate to Add Entry tab
+                                if (widget.onNavigate != null) {
+                                  widget.onNavigate!(2); // Navigate to Add Entry tab
                                 }
                               },
                             ).animate().fadeIn(delay: 900.ms).slideX(begin: -0.1),
@@ -215,8 +303,8 @@ class HomeScreen extends StatelessWidget {
                               icon: Icons.trending_up,
                               label: 'View Trends',
                               onTap: () {
-                                if (onNavigate != null) {
-                                  onNavigate!(1); // Navigate to Insights tab
+                                if (widget.onNavigate != null) {
+                                  widget.onNavigate!(1); // Navigate to Insights tab
                                 }
                               },
                             ).animate().fadeIn(delay: 950.ms).slideX(begin: 0.1),
@@ -231,13 +319,13 @@ class HomeScreen extends StatelessWidget {
                             child: _buildQuickAction(
                               context,
                               icon: Icons.water_drop,
-                              label: '+250ml Water',
+                              label: '+1 Glass Water',
                               onTap: () async {
                                 await healthProvider.quickAddWater(250);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: const Text('Added 250ml water!'),
+                                      content: const Text('Added 1 glass of water!'),
                                       backgroundColor: Colors.cyan[600],
                                       behavior: SnackBarBehavior.floating,
                                       duration: const Duration(seconds: 2),
@@ -280,11 +368,36 @@ class HomeScreen extends StatelessWidget {
                               icon: Icons.assessment,
                               label: 'View Report',
                               onTap: () {
-                                if (onNavigate != null) {
-                                  onNavigate!(3); // Navigate to Report tab
+                                if (widget.onNavigate != null) {
+                                  widget.onNavigate!(3); // Navigate to Report tab
                                 }
                               },
                             ).animate().fadeIn(delay: 1100.ms).slideY(begin: 0.1),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildQuickAction(
+                              context,
+                              icon: Icons.undo,
+                              label: 'Undo Activity',
+                              onTap: () async {
+                                final success = await healthProvider.undoLastActivity();
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      success
+                                          ? 'Last activity undone.'
+                                          : 'Nothing to undo yet.',
+                                    ),
+                                    backgroundColor:
+                                        success ? Colors.green[600] : Colors.grey[700],
+                                    behavior: SnackBarBehavior.floating,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ).animate().fadeIn(delay: 1150.ms).slideY(begin: 0.1),
                           ),
                         ],
                       ),
@@ -331,8 +444,9 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
-          ),
+              ],
+            ),
+          ],
         );
       },
     );
@@ -385,6 +499,94 @@ class HomeScreen extends StatelessWidget {
           index,
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildBadgeCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container
+    (
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getStreakBadgeTitle(int streak) {
+    if (streak >= 30) return 'Legendary Streak';
+    if (streak >= 14) return 'Champion Streak';
+    if (streak >= 7) return 'Golden Streak';
+    if (streak >= 3) return 'Getting Consistent';
+    if (streak >= 1) return 'Day One Hero';
+    return 'Start Your Streak';
+  }
+
+  String _getActivityBadgeTitle(double progress) {
+    final percent = (progress * 100).round();
+    if (percent >= 90) return 'Activity Ace';
+    if (percent >= 60) return 'Healthy Habit';
+    if (percent >= 30) return 'On Your Way';
+    if (percent > 0) return 'First Steps';
+    return 'No Activity Yet';
+  }
+
+  void _openCategoryEntry(BuildContext context, HealthCategoryType type) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AddEntryScreen(initialCategory: type),
+      ),
     );
   }
 
@@ -459,6 +661,8 @@ class HomeScreen extends StatelessWidget {
       icon: category.icon,
       color: category.color,
       progress: progress,
+      onTap: () => _openCategoryEntry(context, category.type),
+      onDetailsTap: () => _openCategoryEntry(context, category.type),
     ).animate().fadeIn(delay: Duration(milliseconds: 400 + (index * 100))).scale(
       begin: const Offset(0.95, 0.95),
       delay: Duration(milliseconds: 400 + (index * 100)),

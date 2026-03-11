@@ -12,6 +12,7 @@ class StorageService {
   static const String _isLoggedInKey = 'is_logged_in';
   static const String _userEmailKey = 'user_email';
   static const String _healthGoalsKey = 'health_goals';
+  static const String _languageCodeKey = 'language_code';
 
   static Future<SharedPreferences> _getPrefs() async {
     return await SharedPreferences.getInstance();
@@ -33,6 +34,14 @@ class StorageService {
     
     final jsonList = jsonDecode(jsonString) as List;
     return jsonList.map((json) => HealthEntry.fromJson(json)).toList();
+  }
+
+  static Future<void> removeHealthEntryById(String id) async {
+    final prefs = await _getPrefs();
+    final entries = await getHealthEntries();
+    entries.removeWhere((e) => e.id == id);
+    final jsonList = entries.map((e) => e.toJson()).toList();
+    await prefs.setString(_healthEntriesKey, jsonEncode(jsonList));
   }
 
   static Future<List<HealthEntry>> getEntriesForDate(DateTime date) async {
@@ -122,7 +131,13 @@ class StorageService {
     final prefs = await _getPrefs();
     final jsonString = prefs.getString(_streakKey);
     if (jsonString == null) {
-      return {'streak': 0, 'lastActiveDate': DateTime.now().toIso8601String()};
+      final now = DateTime.now();
+      final initial = {
+        'streak': 1,
+        'lastActiveDate': now.toIso8601String(),
+      };
+      await prefs.setString(_streakKey, jsonEncode(initial));
+      return initial;
     }
     return jsonDecode(jsonString);
   }
@@ -187,5 +202,16 @@ class StorageService {
       return HealthGoals(); // Return default goals
     }
     return HealthGoals.fromJson(jsonDecode(jsonString));
+  }
+
+  // Language
+  static Future<void> setLanguageCode(String code) async {
+    final prefs = await _getPrefs();
+    await prefs.setString(_languageCodeKey, code);
+  }
+
+  static Future<String> getLanguageCode() async {
+    final prefs = await _getPrefs();
+    return prefs.getString(_languageCodeKey) ?? '';
   }
 }

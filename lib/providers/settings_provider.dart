@@ -1,5 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../services/storage_service.dart';
+import '../models/health_entry.dart';
+import '../models/health_goals.dart';
 
 class SettingsProvider with ChangeNotifier {
   bool _hasCompletedOnboarding = false;
@@ -15,6 +19,8 @@ class SettingsProvider with ChangeNotifier {
   bool _workoutEnabled = true;
   bool _vitalSignsEnabled = true;
 
+  String _languageCode = '';
+
   bool get hasCompletedOnboarding => _hasCompletedOnboarding;
   bool get isInitialized => _isInitialized;
   bool get stepCounterEnabled => _stepCounterEnabled;
@@ -25,6 +31,8 @@ class SettingsProvider with ChangeNotifier {
   bool get mentalWellnessEnabled => _mentalWellnessEnabled;
   bool get workoutEnabled => _workoutEnabled;
   bool get vitalSignsEnabled => _vitalSignsEnabled;
+  String get languageCode => _languageCode;
+  bool get hasSelectedLanguage => _languageCode.isNotEmpty;
 
   SettingsProvider() {
     _initialize();
@@ -32,6 +40,7 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> _initialize() async {
     _hasCompletedOnboarding = await StorageService.getOnboardingComplete();
+    _languageCode = await StorageService.getLanguageCode();
     _isInitialized = true;
     notifyListeners();
   }
@@ -88,10 +97,137 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setLanguageCode(String code) async {
+    _languageCode = code;
+    await StorageService.setLanguageCode(code);
+    notifyListeners();
+  }
+
   Future<void> exportData() async {
-    final jsonData = await StorageService.exportAllData();
-    // In a real app, this would trigger a file download or share dialog
-    debugPrint('Exported data: $jsonData');
+    // Load raw data
+    final List<DailyHealthSummary> summaries = await StorageService.getDailySummaries();
+    final entries = await StorageService.getHealthEntries();
+    final HealthGoals goals = await StorageService.getHealthGoals();
+
+    // Sort summaries by date (oldest -> newest)
+    summaries.sort((a, b) => a.date.compareTo(b.date));
+
+    // Compute overall stats
+    int totalSteps = 0;
+    double totalSleep = 0;
+    double totalWater = 0;
+    int totalWorkoutMinutes = 0;
+    int activeDays = 0;
+
+    for (final day in summaries) {
+      if (day.steps > 0) activeDays++;
+      totalSteps += day.steps;
+      totalSleep += day.sleepHours;
+      totalWater += day.waterIntake;
+      totalWorkoutMinutes += day.workoutMinutes;
+    }
+
+    final daysCount = summaries.isNotEmpty ? summaries.length : 1;
+    final avgSteps = daysCount > 0 ? (totalSteps / daysCount).round() : 0;
+    final avgSleep = daysCount > 0 ? totalSleep / daysCount : 0.0;
+    final avgWater = daysCount > 0 ? totalWater / daysCount : 0.0;
+    final avgWorkout = daysCount > 0 ? (totalWorkoutMinutes / daysCount).round() : 0;
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        build: (context) => [
+          pw.Text(
+            'HealTrack Data Export',
+            style: pw.TextStyle(
+              fontSize: 24,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Overview of your tracked health data, reports, and analysis.',
+            style: const pw.TextStyle(fontSize: 12),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Text(
+            'Summary Overview',
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Bullet(text: 'Tracked days: ${summaries.length}'),
+          pw.Bullet(text: 'Total entries: ${entries.length}'),
+          pw.Bullet(text: 'Active days (with steps): $activeDays'),
+          pw.SizedBox(height: 8),
+          pw.Bullet(text: 'Average steps per day: $avgSteps (goal: ${goals.stepsGoal})'),
+          pw.Bullet(text: 'Average sleep per day: ${avgSleep.toStringAsFixed(1)} hrs (goal: ${goals.sleepGoal} hrs)'),
+          pw.Bullet(text: 'Average water per day: ${avgWater.toStringAsFixed(1)} L (goal: ${goals.waterGoal} L)'),
+          pw.Bullet(text: 'Average workout per day: $avgWorkout min (goal: ${goals.workoutMinutesGoal} min)'),
+
+          pw.SizedBox(height: 16),
+          pw.Text(
+            'Recent Daily Summaries',
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          if (summaries.isEmpty)
+            pw.Text('No daily summaries recorded yet.')
+          else
+            pw.Table.fromTextArray(
+              headers: const [
+                'Date',
+                'Steps',
+                'Sleep (hrs)',
+                'Water (L)',
+                'Workout (min)',
+              ],
+              data: summaries
+                  .reversed
+                  .take(14)
+                  .map((s) => [
+                        s.date.toIso8601String().split('T').first,
+                        s.steps.toString(),
+                        s.sleepHours.toStringAsFixed(1),
+                        s.waterIntake.toStringAsFixed(1),
+                        s.workoutMinutes.toString(),
+                      ])
+                  .toList(),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+              ),
+              cellStyle: const pw.TextStyle(fontSize: 10),
+              cellAlignment: pw.Alignment.centerLeft,
+            ),
+          pw.SizedBox(height: 16),
+          pw.Text(
+            'Data Notes',
+            style: pw.TextStyle(
+              fontSize: 16,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            'This PDF is generated from the health data stored locally on your device. '
+            'For more detailed charts and insights, open the HealTrack app and view the Insights and Report sections.',
+            style: pw.TextStyle(fontSize: 10),
+          ),
+        ],
+      ),
+    );
+
+    final bytes = await pdf.save();
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: 'healtrack_data_export_${DateTime.now().toIso8601String()}.pdf',
+    );
   }
 
   Future<void> deleteAllData() async {
